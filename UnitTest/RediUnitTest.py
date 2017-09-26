@@ -1,5 +1,5 @@
 import unittest
-from ApiClass import  ApiBase
+from ApiClass import  RediApiBase
 
 
 class rediUnitText(unittest):

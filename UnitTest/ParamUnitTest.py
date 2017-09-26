@@ -1,10 +1,10 @@
 import unittest
-from ApiClass.ParamObj import BaseParamObj
+from ApiClass.ElemObj import BaseElemObj
 from ApiClass.Field import *
 from ApiException import ApiException
 
 
-class SearchCondition(BaseParamObj):
+class SearchCondition(BaseElemObj):
     id = IntegerField()
     brand = StringField()
     gender = StringField()
@@ -25,7 +25,7 @@ class ParamUnitTest(unittest.TestCase):
         self.assertEqual(condition['tags'], ['1', '2', '3'])
         self.assertTrue(isinstance(condition, dict))
 
-        with self.assertRaises(ApiException.ParamTypeException):
+        with self.assertRaises(ApiException.ElemTypeException):
             SearchCondition(id='1')
 
     def test_key(self):
@@ -54,13 +54,13 @@ class ParamUnitTest(unittest.TestCase):
 
     def test_setKeyParamTypeException(self):
         condition = SearchCondition()
-        with self.assertRaises(ApiException.ParamTypeException):
+        with self.assertRaises(ApiException.ElemTypeException):
             condition['id'] = 'str'
 
 
     def test_setAttrParamTypeException(self):
         condition = SearchCondition()
-        with self.assertRaises(ApiException.ParamTypeException):
+        with self.assertRaises(ApiException.ElemTypeException):
             condition.id = 'str'
 
 

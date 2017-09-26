@@ -1,4 +1,4 @@
-from ApiException.ApiException import ParamTypeException
+from ApiException.ApiException import ElemTypeException
 
 
 class BaseField(object):
@@ -15,7 +15,7 @@ class BaseField(object):
         _type = self.__dict__.get("_type",None)
         if _type :
             return _type
-        raise ParamTypeException("Object's instance._type can not be None")
+        raise ElemTypeException("Object's instance._type can not be None")
 
 
 

@@ -2,7 +2,7 @@ import requests
 import json
 from ApiException import ApiException
 from ApiClass.Field import *
-from ApiClass.ParamObj import BaseParamObj
+from ApiClass.ElemObj import BaseElemObj
 
 
 class Redi(object):
@@ -13,7 +13,7 @@ class Redi(object):
     def getProducts(cls,conditionObj=None):
 
         if conditionObj != None and not isinstance(conditionObj, SearchCondition):
-            raise ApiException.ParamException()
+            raise ApiException.ElemException()
         url = "https://www.redigroup.it/Api/getItems/1.0/%s/" % cls.token
         params = conditionObj
         print(params)
@@ -23,7 +23,7 @@ class Redi(object):
     @classmethod
     def getStocks(cls,conditionObj=None):
         if conditionObj == None or not conditionObj.get('item_id',None):
-            raise ApiException.ParamException("item_id chould not be None")
+            raise ApiException.ElemException("item_id chould not be None")
         url = "https://www.redigroup.it/api/stocks/1.0/%s/"%cls.token
         params = dict(item_id = conditionObj.item_id)
         print(params)
@@ -33,7 +33,7 @@ class Redi(object):
     @classmethod
     def getPrices(cls,conditionObj=None):
         if conditionObj == None or not conditionObj.get('item_id',None):
-            raise ApiException.ParamException("item_id chould not be None")
+            raise ApiException.ElemException("item_id chould not be None")
         url = "https://www.redigroup.it/api/prices/1.0/%s/​"%cls.token
         params = dict(item_id = conditionObj.item_id)
         print(params)
@@ -43,7 +43,7 @@ class Redi(object):
     @classmethod
     def getImages(cls,conditionObj=None):
         if conditionObj == None or not conditionObj.get('item_id',None):
-            raise ApiException.ParamException("item_id chould not be None")
+            raise ApiException.ElemException("item_id chould not be None")
         url = "https://www.redigroup.it/api/images/1.0/%s/​"%cls.token
         params = dict(item_id = conditionObj.item_id)
         print(params)
@@ -72,7 +72,7 @@ class Redi(object):
 
 
 
-class SearchCondition(BaseParamObj):
+class SearchCondition(BaseElemObj):
     item_id = IntegerField()
     item_brand = StringField()
     item_gender = StringField()
@@ -86,10 +86,12 @@ if __name__ == '__main__':
     # print(SearchCondition.__dict__)
     # print(SearchCondition().identification)
     # print(SearchCondition().__dict__)
-
-    condition = SearchCondition(item_id= 268769,item_brand='DONDUP')
+    #item_brand='DONDUP'
+    condition = SearchCondition()
     print(type(condition))
-    print(Redi().getProducts(conditionObj=condition))
-    print(Redi.getStocks(conditionObj=condition))
-    print(Redi.getPrices(conditionObj=condition))
-    print(Redi.getImages(conditionObj=condition))
+    print(len(Redi().getProducts(conditionObj=condition)))
+    # with open('redi.json','wt') as f:
+    #     f.write(json.dumps())
+    # print(Redi.getStocks(conditionObj=condition))
+    # print(Redi.getPrices(conditionObj=condition))
+    # print(Redi.getImages(conditionObj=condition))
