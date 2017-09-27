@@ -1,5 +1,5 @@
 from ApiException.ApiException import ElemTypeException
-
+from bson.objectid import ObjectId
 
 class BaseField(object):
     def __new__(cls, *args, **kwargs):
@@ -41,7 +41,15 @@ class ListField(BaseField):
         self._type = list
         super(ListField, self).__init__()
 
+class BoolField(BaseField):
+    def __init__(self):
+        self._type = bool
+        super(BoolField, self).__init__()
 
+class ObjectIdField(BaseField):
+    def __init__(self):
+        self._type = ObjectId
+        super(ObjectIdField, self).__init__()
 
 if __name__ == '__main__':
     IntegerField()
