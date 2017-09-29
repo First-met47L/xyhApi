@@ -6,7 +6,7 @@ from Tools.Mongo import  MongoDb
 import requests
 import json
 import time
-
+from Tools.ThreadHelp import thread_decorator,MyBoundedSemaphore
 
 
 class LinkShare(object):
@@ -14,6 +14,8 @@ class LinkShare(object):
     mongo = MongoDb()
     mongo.db = 'xyh_api'
     mongo.collection = 'linkshare'
+    semaphore = MyBoundedSemaphore(16)
+
 
     @staticmethod
     def trans2standard(element):
@@ -22,13 +24,14 @@ class LinkShare(object):
         product.sn = element.xpath('linkid/text()')[0]
         product.title = element.xpath('productname/text()')[0]
         product.brand = ""
-        product.description = element.xpath('description/long/text()')[0]
+        long_descs = element.xpath('description/long/text()')
+        product.description = long_descs[0] if long_descs else element.xpath('description/short/text()')[0]
         product.currency = element.xpath('price/@currency')[0]
         product.price = float(element.xpath('saleprice/text()')[0])
         product.original_price = float(element.xpath('price/text()')[0])
         product.images = element.xpath('imageurl/text()')
         product.face_image = product.images[0] if product.images else None
-        product.buy_url = element.xpath('imageurl/text()')[0]
+        product.buy_url = element.xpath('linkurl/text()')[0]
         product.update_at = (lambda time_str: int(time.mktime(time.strptime(time_str, "%Y-%m-%d/%H:%M:%S"))))(
             element.xpath('createdon/text()')[0])
 
@@ -96,9 +99,9 @@ class LinkShare(object):
         for mid in mids:
             # self.execute_script(mid)
             self.execute(mid)
-            break
         self.logger.info("end")
 
+    @thread_decorator(semaphore)
     def execute(self, mid):
         '''
 
@@ -129,11 +132,15 @@ class LinkShare(object):
                     mongo_id = self.mongo.insert(doc=product)
                     self.logger.info("mongo(%s) insert product<sn:%s> successful"%(mongo_id,product.sn))
                 except Exception as e:
+                    self.logger.info(etree.tostring(i))
                     self.logger.exception(e)
             if page_number == total_pages:
                 self.logger.info("page number({0}) is equal to totalpages({1}".format(page_number, total_pages))
+                LinkShare.semaphore.release()
                 return
             page_number += 1
+
+
 
 
     def execute_script(self, mid):

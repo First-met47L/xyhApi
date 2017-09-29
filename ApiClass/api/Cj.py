@@ -3,13 +3,22 @@ from lxml import etree
 from urllib import parse
 from Tools.Log import Log
 from functools import wraps
+from ApiClass.StandardOutput import *
 import requests
+from Tools.Mongo import MongoDb
+import multiprocessing
+from atexit import register
+from threading import BoundedSemaphore
+from threading import Lock
+from threading import Thread
+import threading
+import time
 import json
-
+import os
+from Tools.ThreadHelp import thread_decorator,MyBoundedSemaphore
 
 def singleton(cls):
-    instances = {}
-    print(instances)
+    instances = dict()
 
     @wraps(cls)
     def get_instance(*args, **kwargs):
@@ -18,6 +27,13 @@ def singleton(cls):
         return instances[cls]
 
     return get_instance
+
+
+
+@register
+def Done():
+    CJ.logger.info("All Done")
+    print("Done")
 
 
 @singleton
@@ -47,7 +63,7 @@ class Params(object):
 
     @property
     def price_list(self):
-        return [0,40, 51, 61, 71, 81, 90, 99, 105, 115, 125, 135, 145,
+        return [0, 40, 51, 61, 71, 81, 90, 99, 105, 115, 125, 135, 145,
                 155, 165, 175, 185, 199, 215, 230, 245, 260, 280, 298, 320, 340, 360, 380, 400, 430,
                 460, 490, 520, 550, 580, 610, 655, 700, 750, 800, 870, 930, 999, 1099, 1199, 1299, 1399,
                 1499, 1649, 1809, 2009, 2299, 2599, 2899, 3299, 3859, 4400, 5000, 6000, 7500, 10000,
@@ -55,7 +71,7 @@ class Params(object):
 
     @property
     def advertisers(self):
-        return [2547997,4859615, 4683856]
+        return [2547997, 4859615, 4683856]
         # return [2547997]
 
 
@@ -68,43 +84,94 @@ class CJ(object):
     advertiser_ids = param_obj.advertisers
     records_per_page = 1000
 
+    @staticmethod
+    def trans2standard(element):
+        product = Product()
+        product.source = element.xpath('advertiser-name/text()')[0]
+        product.sn = ':'.join([element.xpath('advertiser-id/text()')[0], element.xpath('sku/text()')[0]])
+        product.title = element.xpath('name/text()')[0]
+        product.brand = element.xpath('manufacturer-name/text()')[0]
+        product.description = element.xpath('description/text()')[0]
+        product.currency = element.xpath('currency/text()')[0]
+        product.price = float(element.xpath('price/text()')[0])
+        retail_price_strs = element.xpath('retail-price/text()')
+        product.original_price = float(retail_price_strs[0]) if retail_price_strs else product.price
+        product.images = element.xpath('image-url/text()')
+        product.face_image = "" if not product.images else product.images[0]
+        product.buy_url = element.xpath('buy-url/text()')[0]
+        product.sizes = []
+        return product
 
     @classmethod
     def run(cls):
+        '''
+        multiprocessing max processing set 4, apply async
+        :return:
+        '''
+        pool = multiprocessing.Pool(4)
         for i in CJ.advertiser_ids:
-            cls.execute(i)
+            print("The pid is %s" % os.getpid())
+            pool.apply_async(func=Execute.execute, args=(i,))
+        pool.close()
+        pool.join()
 
 
 
-    @classmethod
-    def execute(cls,advertiser_id):
-        for i in range(len(cls.price_list)-1):
-            low_price = cls.price_list[i]
-            high_price = cls.price_list[i+1]
-            cls.deep_exec(advertiser_id,low_price,high_price)
-
-
+class Execute(object):
+    semaphore = MyBoundedSemaphore(4)
 
     @classmethod
-    def deep_exec(cls,advertiser_id,low_price,high_price):
+    def execute(cls, advertiser_id):
+        '''
+                The Thread use global parameter together (pymongo can not connect before create fork )
+                :param advertiser_id:
+                :return:
+                '''
+
+        global mongo
+        mongo = MongoDb()
+        mongo.db = 'xyh_api'
+        mongo.collection = 'cj'
+
+
+        print("the pid is %s ,and ppid is %s " % (os.getpid(), os.getppid()))
+        for i in range(len(CJ.price_list) - 1):
+            low_price = CJ.price_list[i]
+            high_price = CJ.price_list[i + 1]
+            cls.deep_exec(advertiser_id, low_price, high_price)
+
+    @classmethod
+    @thread_decorator(semaphore)
+    def deep_exec(cls, advertiser_id, low_price, high_price):
+        '''
+        闭包
+        :param cls:
+        :param advertiser_id:
+        :param low_price:
+        :param high_price:
+        :return:
+        '''
         page_no = 1
-        print(low_price,high_price)
-        count = 1
+        print(low_price, high_price)
         while True:
-            url = cls.url_format.format(advertiser_id,cls.records_per_page,low_price,high_price,page_no)
-            res = requests.get(url=url,headers=cls.headers)
+            url = CJ.url_format.format(advertiser_id, CJ.records_per_page, low_price, high_price, page_no)
+            res = requests.get(url=url, headers=CJ.headers)
             result = res.content
             elements = etree.XML(result)
             for elem in elements.xpath('/cj-api/products/product'):
-                print(elem.xpath('name/text()')[0])
-                print(count)
-                count += 1
+                try:
+                    product = CJ.trans2standard(element=elem)
+                    mongo_id = mongo.insert(doc=product)
+                    CJ.logger.info("mongo(%s) insert product<sn:%s> successful(thread name : %s)" % (
+                        mongo_id, product.sn, threading.current_thread()))
+                except Exception as e:
+                    CJ.logger.exception(etree.tostring(elem))
+                    CJ.logger.exception(e)
             total = int(elements.xpath('/cj-api/products/@total-matched')[0])
-            if page_no*cls.records_per_page > total:
+            if page_no * CJ.records_per_page > total:
                 break
             page_no += 1
-
-
+        cls.semaphore.release()
 
 if __name__ == '__main__':
     CJ.run()

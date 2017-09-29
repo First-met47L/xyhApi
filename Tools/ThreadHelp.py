@@ -1,7 +1,6 @@
-from threading import *
 from functools import wraps
-import time
-
+from threading import BoundedSemaphore
+from threading import Thread
 
 def thread_decorator(semaphore):
     if isinstance(semaphore, MyBoundedSemaphore):
@@ -26,40 +25,3 @@ class MyBoundedSemaphore(BoundedSemaphore):
 
     def __len__(self):
         return self._value
-
-
-semaphore = MyBoundedSemaphore(5)
-
-
-@thread_decorator(semaphore)
-def exex(n):
-    print(str(n))
-    time.sleep(2)
-    semaphore.release()
-
-
-class CJ(object):
-    semaphore = MyBoundedSemaphore(5)
-
-    def run(self):
-        for i in range(10):
-            CJ.exex(i)
-
-    @classmethod
-    @thread_decorator(semaphore)
-    def exex(cls,n):
-        time.sleep(1)
-        print(str(n))
-        cls.semaphore.release()
-
-
-
-# class Myclassmethod(classmethod):
-#     def __call__(self, *args, **kwargs):
-#         return self.
-
-
-
-
-if __name__ == '__main__':
-    CJ().run()
